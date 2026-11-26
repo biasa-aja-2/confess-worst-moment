@@ -37,8 +37,21 @@ def main():
         f.write(LINE)
     # The grader collects /output as another user: leave the file and its
     # folder readable by everyone (a plain open() inherits the umask).
-    os.chmod(path, 0o644)
-    os.chmod(out_dir, 0o755)
+    # Guard the chmod: the grader runs as a different user (65534) and the
+    # output directory may not belong to us, so a bare chmod can raise
+    # PermissionError and kill the run. The file is ours, but be safe anyway.
+    try:
+        os.chmod(path, 0o644)
+    except OSError as exc:
+        print("warning: chmod file failed (%s), continuing" % exc, file=sys.stderr)
+    try:
+        os.chmod(out_dir, 0o755)
+    except OSError as exc:
+        # Same guard as the file chmod above: in the grader the output
+        # directory is owned by another user, so chmod raises PermissionError.
+        # The entry file itself is already written and verified below, so
+        # a failed directory chmod must not fail the run.
+        print("warning: chmod dir failed (%s), continuing" % exc, file=sys.stderr)
 
     # Read-back verification: byte-exact, valid UTF-8, no trailing newline.
     with open(path, "rb") as f:
